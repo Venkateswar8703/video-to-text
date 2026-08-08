@@ -1,0 +1,1928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Transcription & Translation</title>
+    <meta name="description" content="Real-time speech-to-text transcription and translation. Connect to live streams or upload video files." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        /* =====================================================================
+           RESET & DESIGN TOKENS
+        ===================================================================== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:         #080f1e;
+            --bg2:        #0d1629;
+            --surface:    #111827;
+            --surface2:   #1a2235;
+            --border:     #1e2d45;
+            --border2:    #263352;
+            --text:       #e8edf5;
+            --muted:      #7a90b0;
+            --dim:        #4a5e7a;
+            --accent:     #6366f1;
+            --accent-h:   #4f46e5;
+            --accent-glow:rgba(99,102,241,.25);
+            --teal:       #14b8a6;
+            --teal-glow:  rgba(20,184,166,.2);
+            --red:        #f43f5e;
+            --red-glow:   rgba(244,63,94,.15);
+            --yellow:     #fbbf24;
+            --yellow-bg:  rgba(251,191,36,.12);
+            --green:      #22c55e;
+            --green-glow: rgba(34,197,94,.15);
+            --radius:     12px;
+            --radius-sm:  8px;
+            --gap:        1.5rem;
+            --transition: 0.2s ease;
+        }
+
+        html, body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .hidden { display: none !important; }
+
+        /* =====================================================================
+           SCROLLBARS
+        ===================================================================== */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+        /* =====================================================================
+           NAV
+        ===================================================================== */
+        .nav {
+            background: rgba(8,15,30,.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-brand {
+            font-size: 1.05rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text);
+            text-decoration: none;
+            letter-spacing: -.01em;
+        }
+
+        .nav-brand .logo-icon {
+            width: 28px; height: 28px;
+            background: linear-gradient(135deg, var(--accent), var(--teal));
+            border-radius: 7px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+        }
+
+        .nav-brand span { color: var(--accent); }
+
+        .nav-pill {
+            font-size: .75rem;
+            font-weight: 600;
+            background: var(--accent-glow);
+            border: 1px solid rgba(99,102,241,.35);
+            color: #a5b4fc;
+            padding: .25rem .7rem;
+            border-radius: 99px;
+        }
+
+        /* =====================================================================
+           PAGE
+        ===================================================================== */
+        .page {
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+
+        .page-hero {
+            text-align: center;
+            padding: 1rem 0 .5rem;
+        }
+
+        .page-hero h1 {
+            font-size: 2.1rem;
+            font-weight: 700;
+            letter-spacing: -.03em;
+            background: linear-gradient(135deg, #e8edf5 30%, #7a90b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: .5rem;
+        }
+
+        .page-hero p {
+            color: var(--muted);
+            font-size: .95rem;
+        }
+
+        /* =====================================================================
+           INPUT PANEL (Tabs + Forms)
+        ===================================================================== */
+        #input-panel {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        /* Tabs */
+        .tab-row {
+            display: flex;
+            gap: .5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tab-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            padding: .6rem 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--muted);
+            font-family: inherit;
+            font-size: .88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .tab-btn:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, rgba(99,102,241,.15), rgba(20,184,166,.08));
+            border-color: var(--accent);
+            color: #a5b4fc;
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .tab-btn.active.live-tab {
+            background: linear-gradient(135deg, rgba(20,184,166,.15), rgba(99,102,241,.08));
+            border-color: var(--teal);
+            color: #5eead4;
+            box-shadow: 0 0 16px var(--teal-glow);
+        }
+
+        /* Form cards */
+        .form-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            position: relative;
+            transition: border-color var(--transition);
+        }
+
+        .form-card:focus-within { border-color: var(--border2); }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed var(--border2);
+            border-radius: var(--radius-sm);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s, background .2s;
+            position: relative;
+        }
+
+        .drop-zone:hover, .drop-zone.over {
+            border-color: var(--accent);
+            background: rgba(99,102,241,.05);
+        }
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .drop-icon { font-size: 2rem; margin-bottom: .5rem; }
+        .drop-zone h3 { font-size: .95rem; font-weight: 600; margin-bottom: .2rem; }
+        .drop-zone p  { font-size: .82rem; color: var(--muted); }
+
+        /* Form fields */
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .form-group { flex: 1; }
+
+        label {
+            display: block;
+            font-size: .82rem;
+            font-weight: 500;
+            margin-bottom: .35rem;
+            color: var(--muted);
+        }
+
+        input[type="text"], input[type="url"], select {
+            width: 100%;
+            padding: .65rem .9rem;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: .9rem;
+            transition: border-color var(--transition), box-shadow var(--transition);
+        }
+
+        input[type="text"]:focus,
+        input[type="url"]:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        input::placeholder { color: var(--dim); }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .4rem;
+            padding: .65rem 1.4rem;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: .9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-h));
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(99,102,241,.3);
+        }
+
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-primary:disabled { opacity: .45; cursor: not-allowed; transform: none; filter: none; box-shadow: none; }
+
+        .btn-teal {
+            background: linear-gradient(135deg, var(--teal), #0d9488);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(20,184,166,.3);
+        }
+
+        .btn-teal:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-teal:active { transform: translateY(0); }
+        .btn-teal:disabled { opacity: .45; cursor: not-allowed; transform: none; filter: none; box-shadow: none; }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--red), #be123c);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(244,63,94,.3);
+        }
+
+        .btn-danger:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        .btn-full { width: 100%; }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(17,24,39,.92);
+            backdrop-filter: blur(4px);
+            border-radius: var(--radius);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 38px; height: 38px;
+            border: 3px solid var(--border2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        .spinner.teal { border-top-color: var(--teal); }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-overlay p { color: var(--muted); font-size: .88rem; }
+
+        .hidden { display: none !important; }
+
+        /* =====================================================================
+           WORKSPACE — FILE MODE (video + summary + transcript)
+        ===================================================================== */
+        #file-workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--gap);
+            height: calc(100vh - 58px - 4rem);
+            min-height: 520px;
+        }
+
+        .col-left, .col-right {
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        /* Card base */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: border-color var(--transition);
+        }
+
+        .card-head {
+            padding: .8rem 1.2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            background: rgba(0,0,0,.25);
+        }
+
+        .card-head-title {
+            font-size: .88rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            color: var(--text);
+        }
+
+        .card-head-title svg { color: var(--accent); flex-shrink: 0; }
+
+        /* Badge */
+        .badge {
+            font-size: .72rem;
+            font-weight: 600;
+            padding: .18rem .6rem;
+            border-radius: 99px;
+            background: rgba(255,255,255,.06);
+            color: var(--muted);
+            border: 1px solid var(--border);
+        }
+
+        .badge-live {
+            background: rgba(244, 63, 94, .12);
+            color: var(--red);
+            border-color: rgba(244,63,94,.3);
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+        }
+
+        .badge-teal {
+            background: rgba(20,184,166,.12);
+            color: var(--teal);
+            border-color: rgba(20,184,166,.3);
+        }
+
+        .live-dot {
+            width: 6px; height: 6px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: blink 1.4s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: .2; }
+        }
+
+        /* Video */
+        .video-card { flex-shrink: 0; }
+
+        .video-wrap {
+            background: #000;
+            aspect-ratio: 16 / 9;
+        }
+
+        video { width: 100%; height: 100%; display: block; }
+
+        /* Summary */
+        .summary-card { flex: 1; min-height: 0; }
+
+        .summary-body {
+            padding: 1.2rem;
+            overflow-y: auto;
+            flex: 1;
+            font-size: .9rem;
+            line-height: 1.75;
+            color: var(--text);
+        }
+
+        .summary-body h1, .summary-body h2, .summary-body h3 { margin: 1em 0 .35em; font-size: .95em; color: #fff; }
+        .summary-body h1:first-child, .summary-body h2:first-child, .summary-body h3:first-child { margin-top: 0; }
+        .summary-body p { margin-bottom: .7em; }
+        .summary-body ul { padding-left: 1.2em; margin-bottom: .7em; }
+        .summary-body li { margin-bottom: .2em; }
+        .summary-body strong { color: #fff; }
+
+        /* Transcript (file mode) */
+        .transcript-card { flex: 1; min-height: 0; }
+
+        .transcript-body {
+            padding: 1.2rem;
+            overflow-y: auto;
+            flex: 1;
+            font-size: .95rem;
+            line-height: 2;
+            color: var(--muted);
+        }
+
+        .speaker-tag {
+            display: block;
+            color: var(--accent);
+            font-weight: 700;
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin: 1.2rem 0 .4rem;
+        }
+
+        .speaker-tag:first-child { margin-top: 0; }
+
+        .word {
+            padding: 2px 3px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background .1s, color .1s;
+        }
+
+        .word {
+            display: inline;
+            padding: 2px 3px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s ease, opacity 0.2s ease, filter 0.2s ease, color 0.15s ease;
+        }
+
+        .word:hover { background: rgba(255,255,255,.12); color: var(--text); }
+
+        .word.active {
+            background: linear-gradient(135deg, var(--teal), #0d9488) !important;
+            color: #080f1e !important;
+            font-weight: 700 !important;
+            box-shadow: 0 0 10px var(--teal-glow);
+            border-radius: 4px;
+            opacity: 1 !important;
+            filter: none !important;
+        }
+
+        /* Synchronized progressive reveal mode styling */
+        .sync-mode-active .word.future-word {
+            opacity: 0.18;
+            filter: blur(0.4px);
+            user-select: none;
+        }
+
+        .sync-mode-active .word.past-word {
+            opacity: 0.88;
+        }
+
+        /* Toggle checkbox styling */
+        .sync-toggle-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--muted);
+            cursor: pointer;
+            user-select: none;
+            font-weight: 500;
+        }
+
+        .sync-toggle-label input[type="checkbox"] {
+            accent-color: var(--teal);
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+        }
+
+        /* =====================================================================
+           WORKSPACE — LIVE STREAM MODE
+        ===================================================================== */
+        #live-workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--gap);
+            min-height: calc(100vh - 58px - 4rem);
+        }
+
+        @media (max-width: 992px) {
+            #live-workspace {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+        }
+
+        /* Side-by-side Media Player card styling */
+        .media-player-card {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border: 1px solid var(--border);
+            margin-bottom: .85rem;
+        }
+
+        .media-player-aspect {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            position: relative;
+            background: #000;
+        }
+
+        .media-player-aspect video,
+        .media-player-aspect iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: block;
+            object-fit: contain;
+        }
+
+        /* Stream status card (left) */
+        .stream-status-card {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stream-info-body {
+            padding: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Pulsing waveform animation for LIVE state */
+        .wave-container {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 4px;
+            height: 50px;
+        }
+
+        .wave-bar {
+            width: 5px;
+            border-radius: 3px;
+            background: linear-gradient(180deg, var(--teal), var(--accent));
+            animation: wave-pulse 1.2s ease-in-out infinite;
+            transform-origin: bottom;
+        }
+
+        .wave-bar:nth-child(1)  { animation-delay: 0s;    height: 20px; }
+        .wave-bar:nth-child(2)  { animation-delay: .1s;   height: 35px; }
+        .wave-bar:nth-child(3)  { animation-delay: .2s;   height: 48px; }
+        .wave-bar:nth-child(4)  { animation-delay: .3s;   height: 30px; }
+        .wave-bar:nth-child(5)  { animation-delay: .4s;   height: 42px; }
+        .wave-bar:nth-child(6)  { animation-delay: .5s;   height: 22px; }
+        .wave-bar:nth-child(7)  { animation-delay: .6s;   height: 38px; }
+        .wave-bar:nth-child(8)  { animation-delay: .7s;   height: 28px; }
+        .wave-bar:nth-child(9)  { animation-delay: .8s;   height: 45px; }
+        .wave-bar:nth-child(10) { animation-delay: .9s;   height: 18px; }
+
+        @keyframes wave-pulse {
+            0%, 100% { transform: scaleY(0.35); opacity: .5; }
+            50%       { transform: scaleY(1);    opacity: 1; }
+        }
+
+        .wave-container.paused .wave-bar {
+            animation-play-state: paused;
+            opacity: .25;
+        }
+
+        /* Stream stats */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .75rem;
+        }
+
+        .stat-box {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: .75rem;
+            text-align: center;
+        }
+
+        .stat-box .val {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--teal);
+            line-height: 1;
+            margin-bottom: .25rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stat-box .lbl {
+            font-size: .72rem;
+            font-weight: 500;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+        /* URL display */
+        .url-display {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: .65rem .85rem;
+        }
+
+        .url-display .url-label {
+            font-size: .72rem;
+            font-weight: 500;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            margin-bottom: .2rem;
+        }
+
+        .url-display .url-text {
+            font-size: .8rem;
+            color: var(--teal);
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Status indicator */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            font-size: .85rem;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot.connecting { background: var(--yellow); animation: blink 0.8s ease-in-out infinite; }
+        .status-dot.live       { background: var(--green);  animation: blink 1.4s ease-in-out infinite; }
+        .status-dot.stopped    { background: var(--dim); }
+        .status-dot.error      { background: var(--red); }
+
+        /* Stop button inside card */
+        .stop-btn-wrap {
+            margin-top: auto;
+            padding-top: .5rem;
+        }
+
+        /* Live transcript card (right) */
+        .live-transcript-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .live-transcript-body {
+            padding: 1.4rem;
+            overflow-y: auto;
+            flex: 1;
+            font-size: 1rem;
+            line-height: 1.9;
+            color: var(--muted);
+        }
+
+        /* Chunk items */
+        .chunk-item {
+            margin-bottom: 1.4rem;
+            display: flex;
+            gap: .9rem;
+            align-items: flex-start;
+            animation: fadeSlideIn .5s ease forwards;
+        }
+
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .timestamp-pill {
+            flex-shrink: 0;
+            margin-top: .28rem;
+            font-size: .72rem;
+            font-weight: 700;
+            background: rgba(20,184,166,.12);
+            color: var(--teal);
+            border: 1px solid rgba(20,184,166,.25);
+            border-radius: 99px;
+            padding: .15rem .55rem;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .02em;
+        }
+
+        .chunk-text {
+            color: var(--text);
+            flex: 1;
+        }
+
+        .chunk-error-item {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            font-size: .82rem;
+            color: rgba(244,63,94,.7);
+            padding: .5rem .7rem;
+            background: rgba(244,63,94,.07);
+            border: 1px solid rgba(244,63,94,.15);
+            border-radius: var(--radius-sm);
+            margin-bottom: .75rem;
+            animation: fadeSlideIn .4s ease forwards;
+        }
+
+        .connecting-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: .9rem;
+            color: var(--muted);
+            font-size: .9rem;
+            text-align: center;
+        }
+
+        .connecting-placeholder .pulse-ring {
+            width: 56px; height: 56px;
+            border: 3px solid var(--teal);
+            border-radius: 50%;
+            animation: pingRing 1.5s ease-in-out infinite;
+            opacity: .6;
+        }
+
+        @keyframes pingRing {
+            0%   { transform: scale(0.8); opacity: .8; }
+            70%  { transform: scale(1.2); opacity: 0; }
+            100% { transform: scale(0.8); opacity: 0; }
+        }
+
+        /* =====================================================================
+           LANGUAGE DETECTION BANNER
+        ===================================================================== */
+        .lang-banner {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            flex-wrap: wrap;
+        }
+
+        .lang-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            font-size: .75rem;
+            font-weight: 700;
+            padding: .22rem .65rem;
+            border-radius: 99px;
+            background: linear-gradient(135deg, rgba(99,102,241,.18), rgba(20,184,166,.12));
+            border: 1px solid rgba(99,102,241,.4);
+            color: #a5b4fc;
+            letter-spacing: .02em;
+            white-space: nowrap;
+        }
+
+        .lang-badge .lang-flag { font-size: 1em; }
+
+        .translate-bar {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            flex-wrap: wrap;
+            margin-left: auto;
+        }
+
+        .translate-bar label {
+            font-size: .75rem;
+            color: var(--muted);
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        .translate-lang-select {
+            padding: .3rem .55rem;
+            font-size: .8rem;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            cursor: pointer;
+            transition: border-color var(--transition);
+        }
+
+        .translate-lang-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn-translate {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .32rem .85rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-h));
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #fff;
+            font-family: inherit;
+            font-size: .8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+            white-space: nowrap;
+        }
+
+        .btn-translate:hover { filter: brightness(1.12); transform: translateY(-1px); }
+        .btn-translate:disabled { opacity: .45; cursor: not-allowed; transform: none; filter: none; }
+
+        /* Translation result panel */
+        .translation-panel {
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .translation-panel-head {
+            padding: .65rem 1.2rem;
+            background: rgba(0,0,0,.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .6rem;
+        }
+
+        .translation-panel-title {
+            font-size: .82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            color: var(--text);
+        }
+
+        .translation-panel-title svg { color: var(--teal); }
+
+        .badge-translated {
+            background: rgba(34,197,94,.12);
+            color: var(--green);
+            border-color: rgba(34,197,94,.3);
+            font-size: .72rem;
+            font-weight: 600;
+            padding: .18rem .6rem;
+            border-radius: 99px;
+            border: 1px solid;
+        }
+
+        .translation-body {
+            padding: 1rem 1.2rem;
+            max-height: 220px;
+            overflow-y: auto;
+            font-size: .9rem;
+            line-height: 1.8;
+            color: var(--text);
+            white-space: pre-wrap;
+        }
+
+        .translation-loading {
+            padding: .75rem 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            font-size: .85rem;
+            color: var(--muted);
+        }
+
+        .spinner-sm {
+            width: 16px; height: 16px;
+            border: 2px solid var(--border2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            flex-shrink: 0;
+        }
+
+        .btn-copy-translation {
+            padding: .22rem .6rem;
+            background: rgba(255,255,255,.07);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--muted);
+            font-size: .75rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .btn-copy-translation:hover { background: rgba(255,255,255,.12); color: var(--text); }
+
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+    <a class="nav-brand" href="/">
+        <div class="logo-icon">🎙</div>
+        Live Stream<span> Transcriber</span>
+    </a>
+</nav>
+
+<!-- PAGE -->
+<div class="page">
+
+    <!-- HERO (hidden when workspace is active) -->
+    <div class="page-hero" id="page-hero">
+        <h1>Live Audio Transcription & English Translation</h1>
+        <p>Connect to a live audio stream link or stream directly from your browser microphone in real time.</p>
+    </div>
+
+    <!-- ── INPUT PANEL ── -->
+    <section id="input-panel">
+
+        <!-- LIVE STREAM & VIDEO PANEL -->
+        <div id="live-tab-content">
+            <div class="form-card">
+
+                <div class="form-group" id="group-stream-url">
+                    <label for="stream-url" style="font-weight:600; font-size:.9rem; display:flex; align-items:center; justify-content:space-between;">
+                        <span>🎬 Video & Live Stream Link</span>
+                        <span style="font-size:.72rem; color:var(--teal); font-weight:500;">YouTube · MP4 · WebM · HLS .m3u8</span>
+                    </label>
+                    <input
+                        type="url"
+                        id="stream-url"
+                        placeholder="Paste YouTube link, direct video/audio stream URL (.mp4, .m3u8), or live news stream link..."
+                        autocomplete="off"
+                        spellcheck="false"
+                    />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="chunk-size">Chunk Size (seconds)</label>
+                        <select id="chunk-size">
+                            <option value="4" selected>4 seconds — standard (recommended)</option>
+                            <option value="3">3 seconds — low latency</option>
+                            <option value="5">5 seconds — balanced</option>
+                            <option value="6">6 seconds — stable</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: .75rem; margin-bottom: 1.25rem; padding: .75rem 1rem; background: rgba(56,189,248,.07); border: 1px solid rgba(56,189,248,.25); border-radius: var(--radius-md);">
+                    <label style="display:flex; align-items:center; justify-content:space-between; margin:0; cursor:pointer; color:var(--text-bright); font-weight:600; font-size:.88rem;">
+                        <span style="display:flex; align-items:center; gap:.5rem;">
+                            🌐 English-Only Live Pipeline
+                            <span style="font-size:.72rem; padding:2px 7px; background:rgba(56,189,248,.22); color:#38bdf8; border-radius:4px; font-weight:600;">Gemini LLM</span>
+                        </span>
+                        <input type="checkbox" id="english-only-toggle" checked style="width:1.15rem; height:1.15rem; accent-color:#38bdf8; cursor:pointer;" />
+                    </label>
+                    <div style="font-size:.76rem; color:var(--text-dim); margin-top:.35rem; line-height:1.35;">
+                        Transcribes spoken audio in any language and <strong>immediately converts chunk-by-chunk to English</strong> so live output is stream-rendered in English only.
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <button class="btn btn-teal btn-full" id="start-btn" onclick="startLiveStream()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87a15.86,15.86,0,0,1,8.12-13.82,16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
+                        Start Live Video & Transcript
+                    </button>
+                    <button class="btn btn-danger hidden" id="stop-btn" onclick="stopLiveStream()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H40a16,16,0,0,0-16,16V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48Z"/></svg>
+                        Stop
+                    </button>
+                </div>
+
+                <div id="stream-error-msg" class="hidden" style="font-size:.83rem;color:var(--red);padding:.5rem .75rem;background:var(--red-glow);border:1px solid rgba(244,63,94,.2);border-radius:var(--radius-sm);"></div>
+
+            </div>
+        </div>
+
+    </section>
+
+
+
+    <!-- ── LIVE WORKSPACE (side-by-side video player + live transcript) ── -->
+    <section id="live-workspace" class="hidden">
+
+        <!-- LEFT: Media Player & Stream status -->
+        <div class="card stream-status-card">
+            <div class="card-head">
+                <span class="card-head-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256" fill="currentColor" style="color:var(--teal)"><path d="M216,48H40A16,16,0,0,0,24,64V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM96,160V96l64,32Z"/></svg>
+                    Video & Media Stream
+                </span>
+                <span class="badge badge-teal" id="live-status-badge">Idle</span>
+            </div>
+
+            <div class="stream-info-body">
+
+                <!-- Embedded Side-by-Side Video / Player Box -->
+                <div id="media-player-box" class="media-player-card hidden">
+                    <div class="media-player-aspect">
+                        <video id="live-video-player" controls playsinline class="hidden"></video>
+                        <iframe id="live-youtube-player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen class="hidden"></iframe>
+                        <iframe id="live-generic-iframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen class="hidden"></iframe>
+                    </div>
+                    <div style="padding: 0.4rem 0.75rem; background: rgba(0,0,0,0.6); font-size: 0.76rem; color: var(--muted); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <span id="player-status-badge">🎬 Video Stream Active</span>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <button id="toggle-player-mode-btn" onclick="togglePlayerMode()" style="font-size:0.72rem; padding: 2px 8px; background: rgba(20,184,166,0.18); border: 1px solid rgba(20,184,166,0.35); border-radius: 4px; color: var(--teal); cursor: pointer; font-weight: 600;" class="hidden">🔄 Switch Player Mode</button>
+                            <span style="color: var(--teal); font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 180px;" id="player-title">Live Video</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Waveform animation -->
+                <div class="wave-container paused" id="wave-container">
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                </div>
+
+                <!-- Status row -->
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-dot stopped" id="status-dot"></span>
+                    <span id="status-label">Waiting to connect…</span>
+                </div>
+
+                <!-- URL display -->
+                <div class="url-display" id="url-display">
+                    <div class="url-label">Source</div>
+                    <div class="url-text" id="url-text">—</div>
+                </div>
+
+                <!-- Stats -->
+                <div class="stat-grid">
+                    <div class="stat-box">
+                        <div class="val" id="stat-chunks">0</div>
+                        <div class="lbl">Chunks</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="val" id="stat-words">0</div>
+                        <div class="lbl">Words</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="val" id="stat-duration">0s</div>
+                        <div class="lbl">Duration</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="val" id="stat-wpm">—</div>
+                        <div class="lbl">WPM</div>
+                    </div>
+                    <div class="stat-box" style="grid-column: span 2; background: linear-gradient(135deg, rgba(34,197,94,0.12), rgba(20,184,166,0.08)); border-color: rgba(34,197,94,0.35);">
+                        <div class="val" id="stat-cost" style="font-size: 1.25rem; color: #4ade80;">$0.0000</div>
+                        <div class="lbl" style="display:flex; align-items:center; justify-content:center; gap:5px; color: #4ade80; font-weight:600;">
+                            <span>💵 Est. Total Cost ($ USD)</span>
+                            <span class="badge" style="font-size:0.62rem; background:rgba(34,197,94,0.25); color:#bbf7d0; border:none; padding:1px 5px;">STT + LLM</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- RIGHT: live scrolling transcript -->
+        <div class="card live-transcript-card">
+            <div class="card-head" style="flex-wrap:wrap; gap:.5rem;">
+                <span class="card-head-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M72,120H184a8,8,0,0,1,0,16H72a8,8,0,0,1,0-16Zm-8-32H192a8,8,0,0,1,0,16H64a8,8,0,0,1,0-16Zm128,80H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Z"/></svg>
+                    Live Transcript
+                </span>
+                <span class="badge badge-live" id="live-badge">
+                    <span class="live-dot"></span>
+                    LIVE
+                </span>
+                <!-- Live detected language banner -->
+                <div id="live-translate-bar" class="hidden" style="width:100%;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;padding:.35rem 0 0;border-top:1px solid var(--border);margin-top:.15rem;">
+                    <span class="lang-badge">
+                        <span class="lang-flag">🌐</span>
+                        <span id="live-lang-badge-text">Detected: Auto-detecting...</span>
+                    </span>
+                </div>
+            </div>
+            <div class="live-transcript-body" id="live-transcript-content">
+                <div class="connecting-placeholder" id="connect-placeholder">
+                    <div class="pulse-ring"></div>
+                    <p id="connect-msg">Connecting to stream…<br><span style="color:var(--dim);font-size:.82rem;">Transcript will appear here in real time side-by-side with video</span></p>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+</div><!-- /.page -->
+
+<script>
+(function () {
+    /* ================================================================
+       STATE
+    ================================================================ */
+    let activeTab       = 'file';
+    let words           = [];
+    let lastActiveIdx   = -1;
+    let currentSession  = null;  // { abortCtrl, sessionId }
+    let streamStats     = { chunks: 0, words: 0, startMs: 0, tokens: 0, promptTokens: 0, completionTokens: 0, cost: 0 };
+    let liveTotalText   = '';    // accumulated live transcript for translation
+
+    /* ================================================================
+       ELEMENT REFS
+    ================================================================ */
+    const pageHero        = document.getElementById('page-hero');
+    const inputPanel      = document.getElementById('input-panel');
+    const fileWorkspace   = document.getElementById('file-workspace');
+    const liveWorkspace   = document.getElementById('live-workspace');
+    // Live stream elements
+    const streamUrlInput  = document.getElementById('stream-url');
+    const chunkSizeSelect = document.getElementById('chunk-size');
+    const liveLanguage    = document.getElementById('live-language');
+    const startBtn        = document.getElementById('start-btn');
+    const stopBtn         = document.getElementById('stop-btn');
+    const streamErrMsg    = document.getElementById('stream-error-msg');
+    const liveTranscript  = document.getElementById('live-transcript-content');
+    const connectPlace    = document.getElementById('connect-placeholder');
+    const waveContainer   = document.getElementById('wave-container');
+    const liveBadge       = document.getElementById('live-badge');
+    const liveStatusBadge = document.getElementById('live-status-badge');
+    const statusDot       = document.getElementById('status-dot');
+    const statusLabel     = document.getElementById('status-label');
+    const urlDisplay      = document.getElementById('url-display');
+    const urlText         = document.getElementById('url-text');
+    const statChunks      = document.getElementById('stat-chunks');
+    const statWords       = document.getElementById('stat-words');
+    const statDuration    = document.getElementById('stat-duration');
+    const statWpm         = document.getElementById('stat-wpm');
+
+
+
+    const videoFileInput  = document.getElementById('video-file-input');
+
+    function getYouTubeVideoId(url) {
+        if (!url) return null;
+        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|live\/))([\w-]{11})/i);
+        return match ? match[1] : null;
+    }
+
+    let currentHls         = null;
+    let currentActiveUrl   = '';
+    let currentResolvedUrl = '';
+
+    window.togglePlayerMode = function() {
+        const videoEl     = document.getElementById('live-video-player');
+        const ytEl        = document.getElementById('live-youtube-player');
+        const genericIfr  = document.getElementById('live-generic-iframe');
+        const toggleBtn   = document.getElementById('toggle-player-mode-btn');
+
+        if (!videoEl || !ytEl || !genericIfr) return;
+
+        // If currently showing iframe (YouTube or generic), switch to direct HTML5 stream player
+        if (!ytEl.classList.contains('hidden') || !genericIfr.classList.contains('hidden')) {
+            ytEl.classList.add('hidden');
+            genericIfr.classList.add('hidden');
+            ytEl.src = 'about:blank';
+            genericIfr.src = 'about:blank';
+
+            const playSrc = currentResolvedUrl || currentActiveUrl;
+            if (playSrc) {
+                videoEl.classList.remove('hidden');
+                if ((playSrc.includes('.m3u8') || playSrc.includes('manifest')) && window.Hls && Hls.isSupported()) {
+                    if (currentHls) currentHls.destroy();
+                    currentHls = new Hls({ enableWorker: true });
+                    currentHls.loadSource(playSrc);
+                    currentHls.attachMedia(videoEl);
+                    currentHls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        videoEl.play().catch(() => { videoEl.muted = true; videoEl.play().catch(() => {}); });
+                    });
+                } else {
+                    videoEl.src = playSrc;
+                    videoEl.play().catch(() => { videoEl.muted = true; videoEl.play().catch(() => {}); });
+                }
+            }
+            if (toggleBtn) toggleBtn.textContent = '🔄 Switch to Embed Player';
+        } else {
+            // Switch back to iframe embed
+            videoEl.classList.add('hidden');
+            videoEl.pause();
+            if (currentHls) { currentHls.destroy(); currentHls = null; }
+
+            const ytId = getYouTubeVideoId(currentActiveUrl) || getYouTubeVideoId(currentResolvedUrl);
+            if (ytId) {
+                ytEl.src = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=0&enablejsapi=1&rel=0`;
+                ytEl.classList.remove('hidden');
+            } else if (currentActiveUrl || currentResolvedUrl) {
+                const embedSrc = (currentResolvedUrl && (currentResolvedUrl.includes('brightcove') || currentResolvedUrl.includes('player') || currentResolvedUrl.includes('embed') || currentResolvedUrl.includes('jwplayer') || currentResolvedUrl.includes('vimeo'))) ? currentResolvedUrl : currentActiveUrl;
+                genericIfr.src = embedSrc;
+                genericIfr.classList.remove('hidden');
+            }
+            if (toggleBtn) toggleBtn.textContent = '🔄 Switch to Direct Stream';
+        }
+    };
+
+    function embedVideoMedia(url, file, resolvedUrl) {
+        const playerBox   = document.getElementById('media-player-box');
+        const videoEl     = document.getElementById('live-video-player');
+        const ytEl        = document.getElementById('live-youtube-player');
+        const genericIfr  = document.getElementById('live-generic-iframe');
+        const playerTitle = document.getElementById('player-title');
+        const toggleBtn   = document.getElementById('toggle-player-mode-btn');
+
+        if (!playerBox || !videoEl || !ytEl || !genericIfr) return;
+
+        if (url) currentActiveUrl = url;
+        if (resolvedUrl) currentResolvedUrl = resolvedUrl;
+
+        if (currentHls) {
+            currentHls.destroy();
+            currentHls = null;
+        }
+
+        const hideAllPlayers = () => {
+            videoEl.classList.add('hidden');
+            ytEl.classList.add('hidden');
+            genericIfr.classList.add('hidden');
+        };
+
+        // 1. Local video / audio file selected by user
+        if (file) {
+            hideAllPlayers();
+            if (toggleBtn) toggleBtn.classList.add('hidden');
+            const fileUrl = URL.createObjectURL(file);
+            videoEl.src = fileUrl;
+            videoEl.classList.remove('hidden');
+            playerBox.classList.remove('hidden');
+            if (playerTitle) playerTitle.textContent = file.name;
+            videoEl.play().catch(() => {
+                videoEl.muted = true;
+                videoEl.play().catch(() => {});
+            });
+            return;
+        }
+
+        const targetUrl = url || resolvedUrl;
+        if (!targetUrl) return;
+
+        // Show mode toggle button for network stream links
+        if (toggleBtn) toggleBtn.classList.remove('hidden');
+
+        // 2. YouTube Video or Live Stream (using youtube-nocookie.com to prevent CORS & iframe connection blocks)
+        const ytId = getYouTubeVideoId(url) || getYouTubeVideoId(resolvedUrl);
+        if (ytId) {
+            hideAllPlayers();
+            ytEl.src = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=0&enablejsapi=1&rel=0`;
+            ytEl.classList.remove('hidden');
+            playerBox.classList.remove('hidden');
+            if (playerTitle) playerTitle.textContent = `YouTube Video (${ytId})`;
+            return;
+        }
+
+        const playSrc = resolvedUrl || targetUrl;
+
+        // 3. Direct HLS Stream (.m3u8) handling via HLS.js or native HTML5 video
+        if (playSrc.includes('.m3u8') || (targetUrl && targetUrl.includes('.m3u8'))) {
+            hideAllPlayers();
+            videoEl.classList.remove('hidden');
+            playerBox.classList.remove('hidden');
+            if (playerTitle) playerTitle.textContent = 'HLS Live Stream';
+
+            if (window.Hls && Hls.isSupported()) {
+                currentHls = new Hls({ enableWorker: true });
+                currentHls.loadSource(playSrc);
+                currentHls.attachMedia(videoEl);
+                currentHls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    videoEl.play().catch(() => { videoEl.muted = true; videoEl.play().catch(() => {}); });
+                });
+            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                videoEl.src = playSrc;
+                videoEl.play().catch(() => { videoEl.muted = true; videoEl.play().catch(() => {}); });
+            } else {
+                genericIfr.src = playSrc;
+                genericIfr.classList.remove('hidden');
+                playerBox.classList.remove('hidden');
+            }
+            return;
+        }
+
+        // 4. Direct video file links (.mp4, .webm, .mov, .ogg, .mpd)
+        if (/\.(mp4|webm|ogg|mov|mkv|mpd)($|\?)/i.test(playSrc) || /\.(mp4|webm|ogg|mov|mkv|mpd)($|\?)/i.test(targetUrl)) {
+            hideAllPlayers();
+            videoEl.src = playSrc;
+            videoEl.classList.remove('hidden');
+            playerBox.classList.remove('hidden');
+            if (playerTitle) playerTitle.textContent = targetUrl.split('/').pop().split('?')[0] || 'Live Stream';
+            videoEl.play().catch(() => {
+                videoEl.muted = true;
+                videoEl.play().catch(() => {});
+            });
+            return;
+        }
+
+        // 5. Generic video/stream website embed (prefer resolved embedded player URL if available)
+        const embedSrc = (resolvedUrl && (resolvedUrl.includes('brightcove') || resolvedUrl.includes('player') || resolvedUrl.includes('embed') || resolvedUrl.includes('jwplayer') || resolvedUrl.includes('vimeo'))) ? resolvedUrl : targetUrl;
+        hideAllPlayers();
+        genericIfr.src = embedSrc;
+        genericIfr.classList.remove('hidden');
+        playerBox.classList.remove('hidden');
+        if (playerTitle) playerTitle.textContent = embedSrc.replace(/^https?:\/\//, '').split('/')[0] || 'Live Stream';
+    }
+
+    function resetVideoPlayer() {
+        const playerBox   = document.getElementById('media-player-box');
+        const videoEl     = document.getElementById('live-video-player');
+        const ytEl        = document.getElementById('live-youtube-player');
+        const genericIfr  = document.getElementById('live-generic-iframe');
+
+        if (currentHls) {
+            currentHls.destroy();
+            currentHls = null;
+        }
+        if (videoEl) {
+            videoEl.pause();
+            videoEl.removeAttribute('src');
+            videoEl.load();
+            videoEl.classList.add('hidden');
+        }
+        if (ytEl) {
+            ytEl.src = 'about:blank';
+            ytEl.classList.add('hidden');
+        }
+        if (genericIfr) {
+            genericIfr.src = 'about:blank';
+            genericIfr.classList.add('hidden');
+        }
+        if (playerBox) {
+            playerBox.classList.add('hidden');
+        }
+    }
+
+    window.startLiveStream = async function () {
+        const streamUrl    = streamUrlInput.value.trim();
+        const selectedFile = videoFileInput?.files[0];
+        const chunkSecs    = parseInt(chunkSizeSelect.value, 10) || 4;
+
+        if (!streamUrl && !selectedFile) {
+            showStreamError('Please enter a video/stream URL or select a local video/audio file.');
+            return;
+        }
+
+        // Reset UI
+        hideStreamError();
+        streamStats = { chunks: 0, words: 0, startMs: Date.now() };
+        resetLiveUI();
+
+        // Show workspace
+        if (pageHero) pageHero.classList.add('hidden');
+        if (inputPanel) inputPanel.classList.add('hidden');
+        if (fileWorkspace) fileWorkspace.classList.add('hidden');
+        if (liveWorkspace) liveWorkspace.classList.remove('hidden');
+
+        setStreamStatus('connecting');
+        startBtn.classList.add('hidden');
+        stopBtn.classList.remove('hidden');
+
+        // Create abort controller
+        const abortCtrl = new AbortController();
+        currentSession = { abortCtrl, sessionId: null, mode: selectedFile ? 'file' : 'url' };
+        const englishOnly = document.getElementById('english-only-toggle')?.checked || false;
+
+        // Embed video player side-by-side
+        embedVideoMedia(streamUrl, selectedFile);
+
+        // ── LOCAL VIDEO FILE MODE ──
+        if (selectedFile) {
+            if (urlText) urlText.textContent = selectedFile.name;
+            setStreamStatus('live');
+            connectPlace.classList.add('hidden');
+            connectPlace.style.display = 'none';
+
+            try {
+                const liveVideoEl = document.getElementById('live-video-player');
+                const stream = liveVideoEl.captureStream ? liveVideoEl.captureStream() : (liveVideoEl.mozCaptureStream ? liveVideoEl.mozCaptureStream() : null);
+
+                if (stream) {
+                    let chunkIdx = 0;
+                    const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                    currentSession.mediaRecorder = mediaRecorder;
+
+                    mediaRecorder.ondataavailable = async (e) => {
+                        if (!e.data || e.data.size === 0 || !currentSession) return;
+                        chunkIdx++;
+                        const formData = new FormData();
+                        formData.append('file', e.data, `video_chunk_${chunkIdx}.webm`);
+                        formData.append('english_only', englishOnly);
+
+                        try {
+                            const res = await fetch('/api/transcribe-chunk', {
+                                method: 'POST',
+                                body: formData,
+                                signal: abortCtrl.signal
+                            });
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (data.text) {
+                                    appendChunk(data);
+                                }
+                            }
+                        } catch (err) {
+                            if (err.name !== 'AbortError') {
+                                console.warn('Video chunk error:', err);
+                            }
+                        }
+                    };
+
+                    mediaRecorder.start(chunkSecs * 1000);
+                } else {
+                    showStreamError('Video captureStream is not supported in this browser.');
+                }
+            } catch (err) {
+                showStreamError('Error capturing video audio: ' + err.message);
+            }
+            return;
+        }
+
+        // ── STREAM URL MODE (SSE) ──
+        if (urlText) urlText.textContent = streamUrl;
+
+        try {
+            const response = await fetch('/api/stream-transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    stream_url: streamUrl,
+                    chunk_seconds: chunkSecs,
+                    realtime: true,
+                    english_only: englishOnly
+                }),
+                signal: abortCtrl.signal
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.detail || `Server error ${response.status}`);
+            }
+
+            connectPlace.classList.add('hidden');
+
+            const reader  = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buf += decoder.decode(value, { stream: true });
+
+                const parts = buf.split('\n\n');
+                buf = parts.pop();
+
+                for (const part of parts) {
+                    if (!part.trim()) continue;
+                    let evtType = 'message';
+                    let evtData = '';
+
+                    for (const line of part.split('\n')) {
+                        if (line.startsWith('event: ')) evtType = line.slice(7).trim();
+                        else if (line.startsWith('data: '))  evtData = line.slice(6).trim();
+                    }
+
+                    if (!evtData) continue;
+
+                    try {
+                        const payload = JSON.parse(evtData);
+                        handleSSEEvent(evtType, payload);
+                    } catch (_) {}
+                }
+            }
+
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                setStreamStatus('stopped');
+            } else {
+                setStreamStatus('error');
+                showStreamError(err.message);
+                inputPanel.classList.remove('hidden');
+            }
+        } finally {
+            startBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
+            currentSession = null;
+        }
+    };
+
+    /* ================================================================
+       LIVE STREAM — Stop
+    ================================================================ */
+    window.stopLiveStream = function () {
+        if (currentSession && currentSession.mediaRecorder && currentSession.mediaRecorder.state !== 'inactive') {
+            try { currentSession.mediaRecorder.stop(); } catch(_) {}
+        }
+        resetVideoPlayer();
+
+        if (micChunkTimer) {
+            clearTimeout(micChunkTimer);
+            micChunkTimer = null;
+        }
+        if (micMediaRecorder && micMediaRecorder.state !== 'inactive') {
+            try { micMediaRecorder.stop(); } catch(_) {}
+            micMediaRecorder = null;
+        }
+        if (micStreamTracker) {
+            micStreamTracker.getTracks().forEach(track => track.stop());
+            micStreamTracker = null;
+        }
+
+        if (!currentSession) return;
+
+        if (currentSession.abortCtrl) {
+            currentSession.abortCtrl.abort();
+        }
+
+        if (currentSession.sessionId) {
+            fetch(`/api/stream-transcribe/${currentSession.sessionId}`, { method: 'DELETE' })
+                .catch(() => {});
+        }
+
+        currentSession = null;
+        setStreamStatus('stopped');
+        stopBtn.classList.add('hidden');
+        startBtn.classList.remove('hidden');
+
+        setTimeout(() => {
+            inputPanel.classList.remove('hidden');
+            pageHero.classList.remove('hidden');
+        }, 400);
+    };
+
+    /* ================================================================
+       SSE EVENT HANDLER
+    ================================================================ */
+    function handleSSEEvent(type, data) {
+        switch (type) {
+            case 'session':
+                if (currentSession) {
+                    currentSession.sessionId = data.session_id;
+                }
+                setStreamStatus('live');
+                connectPlace.classList.add('hidden');
+                connectPlace.style.display = 'none';
+                if (streamUrlInput && streamUrlInput.value.trim()) {
+                    embedVideoMedia(streamUrlInput.value.trim(), null, data.resolved_url);
+                }
+                break;
+
+            case 'transcript':
+                appendChunk(data);
+                break;
+
+            case 'chunkError':
+                appendChunkError(data);
+                break;
+
+            case 'error':
+                setStreamStatus('error');
+                showStreamError(data.detail || 'Stream error occurred.');
+                // Show input panel so user can try again
+                setTimeout(() => { inputPanel.classList.remove('hidden'); }, 600);
+                startBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+                currentSession = null;
+                break;
+
+            case 'done':
+                if (streamStats.chunks > 0) {
+                    setStreamStatus('completed');
+                } else {
+                    setStreamStatus('stopped');
+                }
+                startBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+                break;
+        }
+    }
+
+    /* ================================================================
+       LIVE TRANSCRIPT — Append chunk
+    ================================================================ */
+    function appendChunk(data) {
+        if (!data.text) return;
+
+        // Update stats
+        streamStats.chunks++;
+        const chunkWordCount = (data.words || []).length;
+        streamStats.words += chunkWordCount;
+        updateStats(data.timestamp_secs);
+
+        // Update live detected language banner
+        const isEngOnly = data.english_only || document.getElementById('english-only-toggle')?.checked;
+        if (data.detected_language) {
+            const liveTransBar = document.getElementById('live-translate-bar');
+            const liveLangText = document.getElementById('live-lang-badge-text');
+            if (liveTransBar) {
+                liveTransBar.classList.remove('hidden');
+                liveTransBar.style.display = 'flex';
+            }
+            if (liveLangText) {
+                const displayName = data.detected_language_name || data.detected_language;
+                if (isEngOnly) {
+                    liveLangText.textContent = `Detected: ${displayName} (${data.detected_language}) ➔ Live English-Only Pipeline Active (Gemini LLM)`;
+                } else {
+                    liveLangText.textContent = `Detected Language: ${displayName} (${data.detected_language})`;
+                }
+            }
+        } else if (streamStats.chunks === 1) {
+            const liveTransBar = document.getElementById('live-translate-bar');
+            if (liveTransBar) {
+                liveTransBar.classList.remove('hidden');
+                liveTransBar.style.display = 'flex';
+            }
+        }
+
+        // Update token & cost telemetry stats
+        if (data.token_usage && data.token_usage.total_tokens) {
+            const tot  = parseInt(data.token_usage.total_tokens, 10) || 0;
+            const pTok = parseInt(data.token_usage.prompt_tokens, 10) || 0;
+            const cTok = parseInt(data.token_usage.completion_tokens, 10) || 0;
+
+            streamStats.tokens += tot;
+            streamStats.promptTokens += pTok;
+            streamStats.completionTokens += cTok;
+
+            const statTokensEl = document.getElementById('stat-tokens');
+            if (statTokensEl) {
+                statTokensEl.textContent = `${streamStats.tokens.toLocaleString()}`;
+                statTokensEl.title = `Prompt: ${streamStats.promptTokens} | Completion: ${streamStats.completionTokens}`;
+            }
+        }
+
+        if (data.total_cost_usd || data.stt_cost_usd || data.llm_cost_usd) {
+            const chunkCost = parseFloat(data.total_cost_usd || ((data.stt_cost_usd || 0) + (data.llm_cost_usd || 0))) || 0;
+            streamStats.cost += chunkCost;
+
+            const statCostEl = document.getElementById('stat-cost');
+            if (statCostEl) {
+                statCostEl.textContent = `$${streamStats.cost.toFixed(5)}`;
+                statCostEl.title = `STT Cost: $${((data.stt_cost_usd || 0)).toFixed(5)} | LLM Cost: $${((data.llm_cost_usd || 0)).toFixed(5)}`;
+            }
+        }
+
+        // Build chunk element
+        const item = document.createElement('div');
+        item.className = 'chunk-item';
+
+        const pill = document.createElement('span');
+        pill.className   = 'timestamp-pill';
+        pill.textContent = formatTimestamp(data.timestamp_secs);
+
+        const origTxt = (data.original_text || data.text || '').trim();
+        const engTxt = (data.english_text || '').trim();
+        const hasTranslation = !isEngOnly && engTxt && (engTxt.toLowerCase() !== origTxt.toLowerCase());
+
+        if (hasTranslation) {
+            const rawLang = (data.detected_language_name || data.detected_language || '').toLowerCase().trim();
+            const langNameMap = {
+                'hin': 'हिंदी', 'hi': 'हिंदी', 'hindi': 'हिंदी',
+                'eng': 'English', 'en': 'English', 'english': 'English',
+                'tel': 'తెలుగు', 'te': 'తెలుగు', 'telugu': 'తెలుగు',
+                'tam': 'தமிழ்', 'ta': 'தமிழ்', 'tamil': 'தமிழ்',
+                'kan': 'ಕನ್ನಡ', 'kn': 'ಕನ್ನಡ', 'kannada': 'ಕನ್ನಡ',
+                'mal': 'മലയാളം', 'ml': 'മലയാളം', 'malayalam': 'മലയാളം',
+                'mar': 'मराठी', 'mr': 'मराठी', 'marathi': 'मराठी',
+                'guj': 'ગુજરાતી', 'gu': 'ગુજરાતી', 'gujarati': 'ગુજરાતી',
+                'pan': 'ਪੰਜਾਬੀ', 'pa': 'ਪੰਜਾਬੀ', 'punjabi': 'ਪੰਜਾਬੀ',
+                'ben': 'বাংলা', 'bn': 'বাংলা', 'bengali': 'বাংলা',
+                'urd': 'اردو', 'ur': 'اردو', 'urdu': 'اردو',
+                'spa': 'Español', 'es': 'Español', 'spanish': 'Español',
+                'fra': 'Français', 'fre': 'Français', 'fr': 'Français', 'french': 'Français',
+                'deu': 'Deutsch', 'ger': 'Deutsch', 'de': 'Deutsch', 'german': 'Deutsch',
+                'ita': 'Italiano', 'it': 'Italiano', 'italian': 'Italiano',
+                'por': 'Português', 'pt': 'Português', 'portuguese': 'Português',
+                'rus': 'Русский', 'ru': 'Русский', 'russian': 'Русский',
+                'zho': '中文', 'chi': '中文', 'zh': '中文', 'chinese': '中文',
+                'jpn': '日本語', 'ja': '日本語', 'japanese': '日本語',
+                'kor': '한국어', 'ko': '한국어', 'korean': '한국어',
+                'ara': 'العربية', 'ar': 'العربية', 'arabic': 'العربية'
+            };
+            const srcLangName = langNameMap[rawLang] || (data.detected_language_name && data.detected_language_name.length > 3 ? data.detected_language_name : (data.detected_language ? data.detected_language.toUpperCase() : 'Original'));
+
+            const bilingualBox = document.createElement('div');
+            bilingualBox.className = 'chunk-bilingual-box';
+            bilingualBox.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%;';
+
+            const srcRow = document.createElement('div');
+            srcRow.style.cssText = 'display: flex; align-items: baseline; gap: 8px; font-size: 0.92rem; line-height: 1.4; color: var(--text-bright);';
+            const srcLabel = document.createElement('span');
+            srcLabel.style.cssText = 'font-weight: 700; color: #a855f7; min-width: 68px; display: inline-block; font-size: 0.85rem; text-transform: capitalize;';
+            srcLabel.textContent = srcLangName + ' :';
+            const srcTextSpan = document.createElement('span');
+            srcTextSpan.textContent = origTxt;
+            srcRow.appendChild(srcLabel);
+            srcRow.appendChild(srcTextSpan);
+
+            const engRow = document.createElement('div');
+            engRow.style.cssText = 'display: flex; align-items: baseline; gap: 8px; font-size: 0.92rem; line-height: 1.4; color: #38bdf8; font-weight: 500;';
+            const engLabel = document.createElement('span');
+            engLabel.style.cssText = 'font-weight: 700; color: #38bdf8; min-width: 68px; display: inline-block; font-size: 0.85rem;';
+            engLabel.textContent = 'English :';
+            const engTextSpan = document.createElement('span');
+            engTextSpan.textContent = engTxt;
+            engRow.appendChild(engLabel);
+            engRow.appendChild(engTextSpan);
+
+            bilingualBox.appendChild(srcRow);
+            bilingualBox.appendChild(engRow);
+
+            item.appendChild(pill);
+            item.appendChild(bilingualBox);
+        } else {
+            const textSpan = document.createElement('span');
+            textSpan.className   = 'chunk-text';
+            textSpan.textContent = data.text;
+
+            item.appendChild(pill);
+            item.appendChild(textSpan);
+        }
+
+
+        liveTranscript.appendChild(item);
+
+        // Auto-scroll to bottom
+        liveTranscript.scrollTo({ top: liveTranscript.scrollHeight, behavior: 'smooth' });
+    }
+
+    function appendChunkError(data) {
+        const item = document.createElement('div');
+        item.className   = 'chunk-error-item';
+        item.textContent = `⚠ Chunk ${data.chunk_index} error: ${data.detail}`;
+        liveTranscript.appendChild(item);
+        liveTranscript.scrollTo({ top: liveTranscript.scrollHeight, behavior: 'smooth' });
+    }
+
+    /* ================================================================
+       STATUS & UI HELPERS
+    ================================================================ */
+    function setStreamStatus(state) {
+        statusDot.className = `status-dot ${state}`;
+
+        const labels = {
+            resolving:  'Resolving URL via yt-dlp…',
+            connecting: 'Connecting…',
+            live:       'Streaming live',
+            stopped:    'Stream stopped',
+            completed:  'Stream completed',
+            error:      'Connection error',
+        };
+        statusLabel.textContent = labels[state] || state;
+
+        const badgeLabels = {
+            resolving:  'Resolving',
+            connecting: 'Connecting',
+            live:       'Live',
+            stopped:    'Stopped',
+            completed:  'Completed',
+            error:      'Error',
+        };
+        liveStatusBadge.textContent = badgeLabels[state] || state;
+
+        if (state === 'live') {
+            waveContainer.classList.remove('paused');
+        } else {
+            waveContainer.classList.add('paused');
+        }
+    }
+
+    function resetLiveUI() {
+        liveTranscript.innerHTML = '';
+        liveTranscript.appendChild(connectPlace);
+        connectPlace.classList.remove('hidden');
+        statChunks.textContent   = '0';
+        statWords.textContent    = '0';
+        statDuration.textContent = '0s';
+        statWpm.textContent      = '—';
+        const statCostEl = document.getElementById('stat-cost');
+        if (statCostEl) statCostEl.textContent = '$0.0000';
+        streamStats = { chunks: 0, words: 0, startMs: Date.now(), tokens: 0, promptTokens: 0, completionTokens: 0, cost: 0 };
+        // Reset live language banner
+        const liveTransBar = document.getElementById('live-translate-bar');
+        const liveLangText = document.getElementById('live-lang-badge-text');
+        if (liveTransBar) { liveTransBar.classList.add('hidden'); liveTransBar.style.display = ''; }
+        if (liveLangText) { liveLangText.textContent = 'Detected: Auto-detecting...'; }
+        setStreamStatus('connecting');
+    }
+
+    function updateStats(latestTimeSecs) {
+        statChunks.textContent = streamStats.chunks;
+        statWords.textContent  = streamStats.words;
+        statDuration.textContent = formatTimestamp(latestTimeSecs);
+
+        const elapsedMins = (Date.now() - streamStats.startMs) / 60000;
+        if (elapsedMins > 0.1 && streamStats.words > 0) {
+            statWpm.textContent = Math.round(streamStats.words / elapsedMins);
+        }
+    }
+
+    function formatTimestamp(secs) {
+        if (secs == null || isNaN(secs)) return '0:00';
+        const m = Math.floor(secs / 60);
+        const s = Math.floor(secs % 60);
+        return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    function showStreamError(msg) {
+        streamErrMsg.textContent = '⚠ ' + msg;
+        streamErrMsg.classList.remove('hidden');
+    }
+
+    function hideStreamError() {
+        streamErrMsg.classList.add('hidden');
+        streamErrMsg.textContent = '';
+    }
+
+    // Restore saved ElevenLabs API key on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedKey = localStorage.getItem('elevenlabs_api_key');
+        const keyInput = document.getElementById('mic-elevenlabs-key');
+        if (savedKey && keyInput) {
+            keyInput.value = savedKey;
+        }
+    });
+
+})();
+</script>
+</body>
+</html>
